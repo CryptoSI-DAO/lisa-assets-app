@@ -6,45 +6,60 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
-    const res = await signIn(email.trim(), password);
+    const res = await signUp(email.trim(), password);
     setLoading(false);
+
     if (res.ok) {
-      router.push("/dashboard");
+      setNotice(
+        "Account created! Check your email for a confirmation link, then sign in.",
+      );
+      setTimeout(() => router.push("/auth/login"), 2000);
     } else {
-      setError(res.error ?? "Unable to sign in.");
+      setError(res.error ?? "Unable to create account.");
     }
   }
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12 sm:px-6">
       <div className="text-center">
-        <div className="text-5xl">🔐</div>
+        <div className="text-5xl">✨</div>
         <h1 className="mt-4 text-3xl font-bold">
-          Sign <span className="text-accent">In</span>
+          Create <span className="text-accent">Account</span>
         </h1>
         <p className="mt-2 text-sm text-muted">
-          Access your reports and subscriptions.
+          Join Lisa&apos;s Assets to save reports and track coefficients.
         </p>
       </div>
 
       {!isSupabaseConfigured && (
         <p className="mt-6 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-300">
-          ⚠️ Supabase isn&apos;t configured yet. Set{" "}
-          <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment to
-          enable authentication.
+          ⚠️ Supabase isn&apos;t configured yet. Authentication is in demo
+          mode.
         </p>
       )}
 
@@ -80,11 +95,29 @@ export default function LoginPage() {
           <input
             id="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="At least 6 characters"
+            className="w-full rounded-xl border border-white/10 bg-surface-light px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="confirm"
+            className="mb-1 block text-sm font-medium text-muted"
+          >
+            Confirm Password
+          </label>
+          <input
+            id="confirm"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Re-enter password"
             className="w-full rounded-xl border border-white/10 bg-surface-light px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
           />
         </div>
@@ -94,23 +127,28 @@ export default function LoginPage() {
             {error}
           </p>
         )}
+        {notice && (
+          <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
+            {notice}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={loading}
           className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-bold text-black transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Signing in…" : "Sign In"}
+          {loading ? "Creating account…" : "Create Account"}
         </button>
       </form>
 
       <p className="mt-4 text-center text-sm text-muted">
-        Don&apos;t have an account?{" "}
+        Already have an account?{" "}
         <Link
-          href="/auth/signup"
+          href="/auth/login"
           className="font-semibold text-accent hover:underline"
         >
-          Create one
+          Sign in
         </Link>
       </p>
     </div>
