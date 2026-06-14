@@ -1,100 +1,41 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import ProjectRow from "@/components/ProjectRow";
 import type { Project, SortKey, SortDirection } from "@/lib/types";
-
-const mockProjects: Project[] = [
-  {
-    id: "ldo",
-    rank: 1,
-    logo: "#f7931a",
-    name: "Lido",
-    symbol: "LDO",
-    coefficient: 8.4,
-    change: 0.6,
-    updated: "2h ago",
-  },
-  {
-    id: "aave",
-    rank: 2,
-    logo: "#2a5ada",
-    name: "Aave",
-    symbol: "AAVE",
-    coefficient: 7.9,
-    change: 0.3,
-    updated: "1d ago",
-  },
-  {
-    id: "uni",
-    rank: 3,
-    logo: "#ff007a",
-    name: "Uniswap",
-    symbol: "UNI",
-    coefficient: 7.5,
-    change: -0.2,
-    updated: "3h ago",
-  },
-  {
-    id: "snx",
-    rank: 4,
-    logo: "#00d1ff",
-    name: "Synthetix",
-    symbol: "SNX",
-    coefficient: 6.8,
-    change: 0.4,
-    updated: "5h ago",
-  },
-  {
-    id: "comp",
-    rank: 5,
-    logo: "#00d395",
-    name: "Compound",
-    symbol: "COMP",
-    coefficient: 6.3,
-    change: -0.5,
-    updated: "8h ago",
-  },
-  {
-    id: "mkr",
-    rank: 6,
-    logo: "#1aab9b",
-    name: "Maker",
-    symbol: "MKR",
-    coefficient: 7.1,
-    change: 0.1,
-    updated: "12h ago",
-  },
-  {
-    id: "crv",
-    rank: 7,
-    logo: "#a41c90",
-    name: "Curve",
-    symbol: "CRV",
-    coefficient: 5.9,
-    change: -0.3,
-    updated: "1d ago",
-  },
-  {
-    id: "bal",
-    rank: 8,
-    logo: "#f5f5f5",
-    name: "Balancer",
-    symbol: "BAL",
-    coefficient: 5.5,
-    change: 0.2,
-    updated: "2d ago",
-  },
-];
+import { getProjects, isApiConfigured } from "@/lib/api";
+import { mockProjects } from "@/lib/mock-projects";
 
 export default function BrowsePage() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [visibleCount, setVisibleCount] = useState(5);
+  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [loading, setLoading] = useState(true);
+
+  // Try the real API; fall back to the seeded mock list. getProjects() already
+  // falls back internally, but we wrap this so we can show a subtle loading
+  // state and reflect API-driven data when it becomes available.
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    getProjects()
+      .then((list) => {
+        if (!mounted) return;
+        if (Array.isArray(list) && list.length > 0) setProjects(list);
+      })
+      .catch(() => {
+        /* getProjects already returns mock on failure */
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const sorted = useMemo(() => {
-    let list = mockProjects;
+    let list = projects;
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -110,7 +51,7 @@ export default function BrowsePage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sortedList;
-  }, [search, sortKey, sortDir]);
+  }, [projects, search, sortKey, sortDir]);
 
   const visible = sorted.slice(0, visibleCount);
   const hasMore = visibleCount < sorted.length;
@@ -135,6 +76,14 @@ export default function BrowsePage() {
           Projects ranked by the Lisa Coefficient — the aggregate output of 8
           AI agents.
         </p>
+        {!isApiConfigured && (
+          <p className="mt-2 inline-block rounded-full border border-white/10 bg-surface px-3 py-1 text-xs text-muted">
+            Demo data · backend not yet connected
+          </p>
+        )}
+        {loading && (
+          <p className="mt-2 text-xs text-muted">Loading projects…</p>
+        )}
       </div>
 
       {/* Search */}

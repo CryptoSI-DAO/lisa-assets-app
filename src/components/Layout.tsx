@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import WalletButton from "./WalletButton";
 
 function Nav() {
   const [open, setOpen] = useState(false);
@@ -29,6 +30,7 @@ function Nav() {
               {l.label}
             </Link>
           ))}
+          <WalletButton />
           <Link
             href="/auth/login"
             className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
@@ -56,6 +58,9 @@ function Nav() {
               {l.label}
             </Link>
           ))}
+          <div className="mt-2">
+            <WalletButton />
+          </div>
           <Link
             href="/auth/login"
             className="mt-2 block rounded-lg bg-accent px-4 py-2 text-center text-sm font-semibold text-black"

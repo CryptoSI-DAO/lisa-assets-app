@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Layout from "@/components/Layout";
-import { AuthProvider } from "@/lib/auth-context";
+import Providers from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -20,9 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="bg-background text-foreground font-sans antialiased">
-        <AuthProvider>
+        <Providers>
           <Layout>{children}</Layout>
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

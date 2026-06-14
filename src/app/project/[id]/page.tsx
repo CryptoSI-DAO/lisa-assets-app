@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AgentScoreBar from "@/components/AgentScoreBar";
+import ReportUnlockCard from "@/components/ReportUnlockCard";
+import { getReport, type ReportResult } from "@/lib/api";
 import {
   AGENTS,
-  mockReport,
-  type MockReport,
   type LisaKimData,
+  type MockReport,
 } from "@/lib/mock-report";
 
 function scoreColorClass(score: number): string {
@@ -40,8 +41,77 @@ function isStale(iso: string): boolean {
   return ms > 30 * 24 * 60 * 60 * 1000;
 }
 
-export default function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const report: MockReport = mockReport;
+export default function ProjectDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const [result, setResult] = useState<ReportResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [forceUnlocked, setForceUnlocked] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setForceUnlocked(false);
+    getReport(params.id)
+      .then((r) => mounted && setResult(r))
+      .catch(() => {
+        if (mounted) {
+          // Treat unexpected errors as a soft-lock so the user can still pay.
+          setResult({ report: null, locked: true, reason: "error" });
+        }
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => {
+      mounted = false;
+    };
+  }, [params.id]);
+
+  if (loading || !result) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16 text-center text-muted sm:px-6">
+        Loading report…
+      </div>
+    );
+  }
+
+  const locked = result.locked && !forceUnlocked;
+
+  if (locked) {
+    return (
+      <>
+        <div className="mx-auto max-w-4xl px-4 pt-10 sm:px-6">
+          <Link
+            href="/browse"
+            className="inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-foreground"
+          >
+            ← Back to projects
+          </Link>
+        </div>
+        <ReportUnlockCard
+          // Prefer the report's coingecko id when known, else the URL id.
+          coingeckoId={(result.report as MockReport | null)?.project?.coingecko_id ?? params.id}
+          onUnlocked={() => setForceUnlocked(true)}
+        />
+      </>
+    );
+  }
+
+  return <ReportView report={result.report!} params={params} />;
+}
+
+// ---------------------------------------------------------------------------
+// Full report view (existing UI, now driven by the unlocked report)
+// ---------------------------------------------------------------------------
+
+function ReportView({
+  report,
+  params,
+}: {
+  report: MockReport;
+  params: { id: string };
+}) {
   const [copied, setCopied] = useState(false);
   const stale = isStale(report.created_at);
 
