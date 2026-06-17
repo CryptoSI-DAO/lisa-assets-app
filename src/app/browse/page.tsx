@@ -1,18 +1,24 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ProjectRow from "@/components/ProjectRow";
 import type { Project, SortKey, SortDirection } from "@/lib/types";
 import { getProjects, isApiConfigured } from "@/lib/api";
 import { mockProjects } from "@/lib/mock-projects";
 
 export default function BrowsePage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [visibleCount, setVisibleCount] = useState(5);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [loading, setLoading] = useState(true);
+
+  // Request report form state
+  const [showRequest, setShowRequest] = useState(false);
+  const [coinInput, setCoinInput] = useState("");
 
   // Try the real API; fall back to the seeded mock list. getProjects() already
   // falls back internally, but we wrap this so we can show a subtle loading
@@ -222,9 +228,60 @@ export default function BrowsePage() {
         <p className="mt-2 text-sm text-muted">
           Request a full report and our 8 AI agents will analyze it.
         </p>
-        <button className="mt-4 rounded-xl bg-accent px-8 py-3 text-sm font-bold text-black transition-transform hover:scale-105">
-          Request Report → $9.99
-        </button>
+
+        {!showRequest ? (
+          <button
+            onClick={() => setShowRequest(true)}
+            className="mt-4 rounded-xl bg-accent px-8 py-3 text-sm font-bold text-black transition-transform hover:scale-105"
+          >
+            Request Report → $9.99
+          </button>
+        ) : (
+          <div className="mx-auto mt-5 max-w-md space-y-3">
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Enter coin name or symbol (e.g. Solana, SOL, pepe)"
+                value={coinInput}
+                onChange={(e) => setCoinInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && coinInput.trim()) {
+                    router.push(`/project/${coinInput.trim().toLowerCase().replace(/\s+/g, "-")}`);
+                  }
+                }}
+                className="w-full rounded-xl border border-white/10 bg-surface-light px-12 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRequest(false)}
+                className="flex-1 rounded-xl border border-white/10 bg-surface-light px-5 py-3 text-sm font-semibold transition-colors hover:bg-surface-lighter"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (coinInput.trim()) {
+                    router.push(
+                      `/project/${coinInput.trim().toLowerCase().replace(/\s+/g, "-")}`,
+                    );
+                  }
+                }}
+                disabled={!coinInput.trim()}
+                className="flex-1 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-black transition-transform hover:scale-[1.02] disabled:opacity-60"
+              >
+                Continue →
+              </button>
+            </div>
+            <p className="text-xs text-muted">
+              You&apos;ll choose payment method on the next screen (USDC on Base or crowdfund).
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

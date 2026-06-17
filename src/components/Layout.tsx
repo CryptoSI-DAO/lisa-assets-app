@@ -3,6 +3,67 @@
 import Link from "next/link";
 import { useState } from "react";
 import WalletButton from "./WalletButton";
+import { useAuth } from "@/lib/auth-context";
+
+function AuthButton({ mobile, onClick }: { mobile?: boolean; onClick?: () => void }) {
+  const { user, loading, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  if (loading) {
+    return (
+      <span className={mobile ? "block py-2 text-sm text-muted" : "text-sm text-muted"}>
+        …
+      </span>
+    );
+  }
+
+  if (user) {
+    return (
+      <div className={mobile ? "mt-2 space-y-2" : "flex items-center gap-3"}>
+        <Link
+          href="/dashboard"
+          onClick={onClick}
+          className={mobile
+            ? "block py-1 text-sm text-muted hover:text-foreground"
+            : "max-w-[160px] truncate text-sm text-muted hover:text-foreground"}
+          title={user.email ?? undefined}
+        >
+          {user.email}
+        </Link>
+        <button
+          onClick={async () => {
+            setSigningOut(true);
+            await signOut();
+            setSigningOut(false);
+            onClick?.();
+          }}
+          disabled={signingOut}
+          className={
+            mobile
+              ? "block w-full rounded-lg border border-white/10 bg-surface px-4 py-2 text-center text-sm font-semibold"
+              : "rounded-lg border border-white/10 bg-surface px-4 py-2 text-sm font-semibold transition-colors hover:bg-surface-lighter disabled:opacity-60"
+          }
+        >
+          {signingOut ? "…" : "Sign Out"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href="/auth/login"
+      onClick={onClick}
+      className={
+        mobile
+          ? "mt-2 block rounded-lg bg-accent px-4 py-2 text-center text-sm font-semibold text-black"
+          : "rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+      }
+    >
+      Sign In
+    </Link>
+  );
+}
 
 function Nav() {
   const [open, setOpen] = useState(false);
@@ -31,12 +92,7 @@ function Nav() {
             </Link>
           ))}
           <WalletButton />
-          <Link
-            href="/auth/login"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-          >
-            Sign In
-          </Link>
+          <AuthButton />
         </div>
         <button
           className="md:hidden text-xl"
@@ -61,13 +117,7 @@ function Nav() {
           <div className="mt-2">
             <WalletButton />
           </div>
-          <Link
-            href="/auth/login"
-            className="mt-2 block rounded-lg bg-accent px-4 py-2 text-center text-sm font-semibold text-black"
-            onClick={() => setOpen(false)}
-          >
-            Sign In
-          </Link>
+          <AuthButton mobile onClick={() => setOpen(false)} />
         </div>
       )}
     </header>
