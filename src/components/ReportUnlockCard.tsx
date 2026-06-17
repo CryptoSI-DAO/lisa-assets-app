@@ -27,6 +27,8 @@ import {
   type TokenDiscount,
 } from "@/lib/api";
 import { useWallet } from "@/lib/wallet-context";
+import { useAuth } from "@/lib/auth-context";
+import { spendTokens, REPORT_TOKEN_COST } from "@/lib/tokens";
 
 interface ReportUnlockCardProps {
   /** Coingecko id of the project to unlock. */
@@ -35,17 +37,20 @@ interface ReportUnlockCardProps {
   onUnlocked: () => void;
 }
 
-type Mode = "choose" | "pay" | "crowdfund";
+type Mode = "choose" | "tokens" | "pay" | "crowdfund";
 
 export default function ReportUnlockCard({
   coingeckoId,
   onUnlocked,
 }: ReportUnlockCardProps) {
-  const { address, isConnected, connect } = useWallet();
+  const { address } = useWallet();
+  const { user, tokenBalance } = useAuth();
 
   const [mode, setMode] = useState<Mode>("choose");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canUseTokens = Boolean(user) && tokenBalance >= REPORT_TOKEN_COST;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
@@ -59,20 +64,6 @@ export default function ReportUnlockCard({
           trajectory analysis, and Lisa Kim&apos;s verdict.
         </p>
 
-        {!isConnected && (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-surface-light p-4 text-sm">
-            <p className="text-muted">
-              Connect a wallet to pay with USDC on Base or join a crowdfund.
-            </p>
-            <button
-              onClick={() => connect().catch((e) => setError(String(e)))}
-              className="mt-3 rounded-lg bg-accent px-5 py-2 text-sm font-bold text-black transition-transform hover:scale-105"
-            >
-              Connect Wallet
-            </button>
-          </div>
-        )}
-
         {error && (
           <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
             {error}
@@ -80,35 +71,76 @@ export default function ReportUnlockCard({
         )}
 
         {mode === "choose" && (
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {/* Token option */}
+            <button
+              onClick={() => {
+                if (!user) {
+                  setError("Sign in to use tokens.");
+                  return;
+                }
+                if (canUseTokens) {
+                  setMode("tokens");
+                } else {
+                  setError(`You need ${REPORT_TOKEN_COST} tokens. Earn them by contributing to CryptoSI DAO.`);
+                }
+              }}
+              className={`group rounded-2xl border p-5 text-left transition-all ${
+                canUseTokens
+                  ? "border-accent/40 bg-accent/5 hover:border-accent"
+                  : "border-white/5 bg-surface-light opacity-60"
+              }`}
+            >
+              <div className="text-2xl">💎</div>
+              <div className="mt-2 font-bold">
+                {REPORT_TOKEN_COST} Tokens
+              </div>
+              <div className="mt-1 text-xs text-muted">
+                {user
+                  ? canUseTokens
+                    ? `You have ${tokenBalance} 💎`
+                    : `${tokenBalance}/${REPORT_TOKEN_COST} 💎 — contribute more!`
+                  : "Sign in required"}
+              </div>
+            </button>
+
+            {/* USDC pay option */}
             <button
               onClick={() => setMode("pay")}
-              disabled={!isConnected}
-              className="group rounded-2xl border border-accent/40 bg-accent/5 p-5 text-left transition-all hover:border-accent disabled:opacity-50"
+              className="group rounded-2xl border border-accent/40 bg-accent/5 p-5 text-left transition-all hover:border-accent"
             >
               <div className="text-2xl">💳</div>
               <div className="mt-2 font-bold">Pay with USDC</div>
               <div className="mt-1 text-xs text-muted">
-                Instant access · ${FULL_REPORT_PRICE_USD.toFixed(2)}
+                ${FULL_REPORT_PRICE_USD.toFixed(2)}
                 <span className="text-accent">
-                  {" "}
-                  or ${DISCOUNTED_REPORT_PRICE_USD.toFixed(2)} with token
+                  {" "}or ${DISCOUNTED_REPORT_PRICE_USD.toFixed(2)} with token
                 </span>
               </div>
             </button>
+
+            {/* Crowdfund option */}
             <button
               onClick={() => setMode("crowdfund")}
-              disabled={!isConnected}
-              className="group rounded-2xl border border-white/10 bg-surface-light p-5 text-left transition-all hover:border-accent/40 disabled:opacity-50"
+              className="group rounded-2xl border border-white/10 bg-surface-light p-5 text-left transition-all hover:border-accent/40"
             >
               <div className="text-2xl">🤝</div>
-              <div className="mt-2 font-bold">Crowdfund it</div>
+              <div className="mt-2 font-bold">Crowdfund</div>
               <div className="mt-1 text-xs text-muted">
-                Pool ${DEFAULT_POOL_GOAL_USD.toFixed(2)} with the community ·
-                unlocks for all contributors
+                Pool ${DEFAULT_POOL_GOAL_USD.toFixed(2)} with the community
               </div>
             </button>
           </div>
+        )}
+
+        {mode === "tokens" && (
+          <TokenFlow
+            coingeckoId={coingeckoId}
+            tokenBalance={tokenBalance}
+            onUnlocked={onUnlocked}
+            onBack={() => setMode("choose")}
+            setError={setError}
+          />
         )}
 
         {mode === "pay" && (
@@ -133,6 +165,82 @@ export default function ReportUnlockCard({
             setBusy={setBusy}
             setError={setError}
           />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Token spend flow
+// ---------------------------------------------------------------------------
+
+function TokenFlow({
+  coingeckoId,
+  tokenBalance,
+  onUnlocked,
+  onBack,
+  setError,
+}: {
+  coingeckoId: string;
+  tokenBalance: number;
+  onUnlocked: () => void;
+  onBack: () => void;
+  setError: (v: string | null) => void;
+}) {
+  const [spending, setSpending] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  async function handleSpend() {
+    setSpending(true);
+    setError(null);
+    try {
+      const res = await spendTokens(coingeckoId);
+      if (res.ok) {
+        setSuccess(true);
+        setTimeout(() => onUnlocked(), 900);
+      } else {
+        setError(res.error ?? "Failed to spend tokens");
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSpending(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 text-left">
+      <button onClick={onBack} className="mb-4 text-xs text-muted hover:text-foreground">
+        ← back
+      </button>
+
+      <div className="rounded-2xl border border-accent/30 bg-accent/5 p-5 text-center">
+        {success ? (
+          <div className="py-4">
+            <div className="text-4xl">🎉</div>
+            <p className="mt-3 text-lg font-bold text-green-400">Report Unlocked!</p>
+            <p className="mt-1 text-sm text-muted">Loading your report…</p>
+          </div>
+        ) : (
+          <>
+            <div className="text-4xl">💎</div>
+            <div className="mt-3 text-sm text-muted">You currently have</div>
+            <div className="text-3xl font-bold text-accent">{tokenBalance} tokens</div>
+            <div className="mt-4 text-sm">
+              Spend <span className="font-bold text-accent">{REPORT_TOKEN_COST} tokens</span> to unlock this report.
+            </div>
+            <div className="mt-1 text-xs text-muted">
+              Remaining after unlock: {tokenBalance - REPORT_TOKEN_COST} 💎
+            </div>
+            <button
+              onClick={handleSpend}
+              disabled={spending}
+              className="mt-5 w-full rounded-xl bg-accent px-5 py-3 text-sm font-bold text-black transition-transform hover:scale-[1.02] disabled:opacity-60"
+            >
+              {spending ? "Unlocking…" : `Spend ${REPORT_TOKEN_COST} 💎 → Unlock`}
+            </button>
+          </>
         )}
       </div>
     </div>

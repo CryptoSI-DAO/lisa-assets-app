@@ -6,7 +6,7 @@ import WalletButton from "./WalletButton";
 import { useAuth } from "@/lib/auth-context";
 
 function AuthButton({ mobile, onClick }: { mobile?: boolean; onClick?: () => void }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, tokenBalance, isAdmin } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
   if (loading) {
@@ -20,12 +20,38 @@ function AuthButton({ mobile, onClick }: { mobile?: boolean; onClick?: () => voi
   if (user) {
     return (
       <div className={mobile ? "mt-2 space-y-2" : "flex items-center gap-3"}>
+        {mobile && (
+          <Link
+            href="/admin"
+            onClick={onClick}
+            className="block py-1 text-sm text-accent hover:underline"
+          >
+            ⚙️ Admin
+          </Link>
+        )}
+        {!mobile && isAdmin && (
+          <Link
+            href="/admin"
+            className="text-sm text-muted transition-colors hover:text-accent"
+            title="Admin Panel"
+          >
+            ⚙️
+          </Link>
+        )}
+        {!mobile && (
+          <span className="flex items-center gap-1 rounded-lg border border-accent/30 bg-accent/5 px-3 py-1.5 text-xs font-bold text-accent">
+            💎 {tokenBalance}
+          </span>
+        )}
+        {mobile && (
+          <div className="text-sm text-accent">💎 {tokenBalance} tokens</div>
+        )}
         <Link
           href="/dashboard"
           onClick={onClick}
           className={mobile
             ? "block py-1 text-sm text-muted hover:text-foreground"
-            : "max-w-[160px] truncate text-sm text-muted hover:text-foreground"}
+            : "max-w-[140px] truncate text-sm text-muted hover:text-foreground"}
           title={user.email ?? undefined}
         >
           {user.email}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AgentScoreBar from "@/components/AgentScoreBar";
 import ReportUnlockCard from "@/components/ReportUnlockCard";
+import { useAuth } from "@/lib/auth-context";
 import { getReport, type ReportResult } from "@/lib/api";
 import {
   AGENTS,
@@ -50,15 +51,40 @@ export default function ProjectDetailPage({
   const [loading, setLoading] = useState(true);
   const [forceUnlocked, setForceUnlocked] = useState(false);
 
+  // Check if user already has this report unlocked via tokens
+  const { user } = useAuth();
+
   useEffect(() => {
     let mounted = true;
     setLoading(true);
     setForceUnlocked(false);
+
+    // First check if user already unlocked this report
+    async function checkUnlocked() {
+      if (user) {
+        try {
+          const { supabase } = await import("@/lib/supabase");
+          const { data } = await supabase
+            .from("unlocked_reports")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("project_id", params.id)
+            .single();
+          if (data && mounted) {
+            setForceUnlocked(true);
+          }
+        } catch {
+          // Not unlocked or not signed in — that's fine
+        }
+      }
+    }
+
+    checkUnlocked();
+
     getReport(params.id)
       .then((r) => mounted && setResult(r))
       .catch(() => {
         if (mounted) {
-          // Treat unexpected errors as a soft-lock so the user can still pay.
           setResult({ report: null, locked: true, reason: "error" });
         }
       })
@@ -66,7 +92,7 @@ export default function ProjectDetailPage({
     return () => {
       mounted = false;
     };
-  }, [params.id]);
+  }, [params.id, user?.id]);
 
   if (loading || !result) {
     return (
